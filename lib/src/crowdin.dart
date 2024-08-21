@@ -116,62 +116,50 @@ class Crowdin {
   static Future<void> loadTranslations(Locale locale) async {
     Map<String, dynamic>? distribution;
 
-    if (!await _isConnectionTypeAllowed(_connectionType)) {
-      _arb = null;
-      return; // return from function if connection type is forbidden for downloading translations
-    }
-
     bool canUpdate = !canUseCachedTranslation(
       distributionTimeToUpdate: _translationTimeToUpdate,
       translationTimestamp: _timestamp,
       cachedTranslationTimestamp: _timestampCached,
     );
 
-    try {
-      if (!canUpdate) {
-        distribution = _storage.getTranslationFromStorage(locale);
-        if (distribution != null) {
-          _arb = AppResourceBundle(distribution);
-          if (_withRealTimeUpdates) {
-            crowdinPreviewManager.setPreviewArb(
-                _arb!); // set default translations for real-time preview
-          }
-          return;
-        }
-      }
-
-      // map locales to avoid problems with different language codes on Crowdin side and supported
-      // by GlobalMaterialLocalizations class for some countries
-      Locale mappedLocale = CrowdinMapper.mapLocale(locale);
-
-      distribution = await _api.loadTranslations(
-          path: _distributionsMap[mappedLocale.toLanguageTag()][0] as String,
-          distributionHash: _distributionHash,
-          timeStamp: _timestamp.toString());
+    if (!canUpdate) {
+      distribution = _storage.getTranslationFromStorage(locale);
       if (distribution != null) {
-        /// todo remove when distribution file locale will be fixed
-        distribution['@@locale'] = locale.toString();
-
-        _storage.setDistributionToStorage(
-          jsonEncode(distribution),
-        );
         _arb = AppResourceBundle(distribution);
-
-        // set initial value for _translationTimeToUpdate
-        if (_updatesInterval != null) {
-          _translationTimeToUpdate = DateTime.now().add(_updatesInterval!);
+        if (_withRealTimeUpdates) {
+          crowdinPreviewManager.setPreviewArb(
+              _arb!); // set default translations for real-time preview
         }
-
-        if (_timestamp != null && _timestamp != _timestampCached) {
-          _storage.setTranslationTimeStampStorage(_timestamp!);
-          _timestampCached = _timestamp;
-        }
+        return;
       }
-    } catch (ex) {
-      CrowdinLogger.printLog(
-          "something went wrong. Crowdin couldn't download translation for '$locale' locale. Next exception occurred: $ex");
-      _arb = null;
-      return;
+    }
+
+    // map locales to avoid problems with different language codes on Crowdin side and supported
+    // by GlobalMaterialLocalizations class for some countries
+    Locale mappedLocale = CrowdinMapper.mapLocale(locale);
+
+    distribution = await _api.loadTranslations(
+        path: _distributionsMap[mappedLocale.toLanguageTag()][0] as String,
+        distributionHash: _distributionHash,
+        timeStamp: _timestamp.toString());
+    if (distribution != null) {
+      /// todo remove when distribution file locale will be fixed
+      distribution['@@locale'] = locale.toString();
+
+      _storage.setDistributionToStorage(
+        jsonEncode(distribution),
+      );
+      _arb = AppResourceBundle(distribution);
+
+      // set initial value for _translationTimeToUpdate
+      if (_updatesInterval != null) {
+        _translationTimeToUpdate = DateTime.now().add(_updatesInterval!);
+      }
+
+      if (_timestamp != null && _timestamp != _timestampCached) {
+        _storage.setTranslationTimeStampStorage(_timestamp!);
+        _timestampCached = _timestamp;
+      }
     }
     if (_withRealTimeUpdates) {
       crowdinPreviewManager.setPreviewArb(_arb!);
